@@ -610,21 +610,30 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
+	embedded := managementasset.EmbeddedHTML()
+	serveEmbedded := func() {
+		if len(embedded) == 0 {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", embedded)
+	}
+
 	filePath := managementasset.FilePath(s.configFilePath)
 	if strings.TrimSpace(filePath) == "" {
-		c.AbortWithStatus(http.StatusNotFound)
+		serveEmbedded()
 		return
 	}
 
 	if _, err := os.Stat(filePath); err != nil {
 		if os.IsNotExist(err) {
 			go managementasset.EnsureLatestManagementHTML(context.Background(), managementasset.StaticDir(s.configFilePath), cfg.ProxyURL, cfg.RemoteManagement.PanelGitHubRepository)
-			c.AbortWithStatus(http.StatusNotFound)
+			serveEmbedded()
 			return
 		}
 
 		log.WithError(err).Error("failed to stat management control panel asset")
-		c.AbortWithStatus(http.StatusInternalServerError)
+		serveEmbedded()
 		return
 	}
 
